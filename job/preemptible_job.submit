@@ -1,13 +1,26 @@
 #!/bin/bash
 #SBATCH --job-name=preempt_example
+#SBATCH --partition=owners
+#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+# Put the job back in the queue if it is preempted (or you run scontrol requeue)
+#SBATCH --requeue
+# NOTE: the out/ directory must exist BEFORE sbatch (Slurm won't create it).
 #SBATCH --output=out/preempt_example_%j.out
 #SBATCH --error=out/preempt_example_%j.err
-#SBATCH --time=02:00:00
-#SBATCH --partition=owners
-#SBATCH --requeue
-#SBATCH --mail-type=begin                    
-#SBATCH --mail-type=end                      
-#SBATCH --mail-user=bchivers@stanford.edu
+# A requeued job keeps its job ID; without this, the log is truncated on restart
+#SBATCH --open-mode=append
 
-mkdir -p ../models/
-apptainer exec ../env/pytorch_latest.sif python3 train_model.py
+echo "===== $(date)  job ${SLURM_JOB_ID}  restart #${SLURM_RESTART_COUNT:-0}  node $(hostname) ====="
+
+# Checkpoints live under the job ID, which stays the same across requeues,
+# so a requeued job finds its own checkpoints and a new submission starts fresh.
+export CKPT_DIR=../models/${SLURM_JOB_ID}
+export RUNS_DIR=../runs/${SLURM_JOB_ID}
+export PYTHONUNBUFFERED=1
+mkdir -p "$CKPT_DIR"
+
+# `exec` replaces this shell with the training process, so Slurm's SIGTERM
+# goes straight to Python, which saves a checkpoint and exits.
+exec apptainer exec ../env/pytorch_latest.sif python3 -u train_model.py

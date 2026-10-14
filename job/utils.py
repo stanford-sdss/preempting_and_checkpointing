@@ -1,5 +1,7 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 # PyTorch models inherit from torch.nn.Module
 class GarmentClassifier(nn.Module):
@@ -22,37 +24,47 @@ class GarmentClassifier(nn.Module):
         return x
 
 
-def train_one_epoch(model, loss_fn, epoch_index, tb_writer, training_loader,optimizer):
+def train_one_epoch(model, loss_fn, epoch_index, tb_writer, training_loader, optimizer,
+                    stop_requested=lambda: False, report_every=500):
+    """Train for one epoch. Returns the average loss over the batches run.
+
+    stop_requested: callable checked before every batch; if it returns True
+    (e.g. SIGTERM was received) we stop early so the caller can checkpoint.
+    """
     running_loss = 0.
-    last_loss = 0.
+    total_loss = 0.
+    n_batches = 0
 
-    # Here, we use enumerate(training_loader) instead of
-    # iter(training_loader) so that we can track the batch
-    # index and do some intra-epoch reporting
-    for i, data in enumerate(training_loader):
-        # Every data instance is an input + label pair
-        inputs, labels = data
+    for i, (inputs, labels) in enumerate(training_loader):
+        if stop_requested():
+            print(f"  stopping early at batch {i} of {len(training_loader)}", flush=True)
+            break
 
-        # Zero your gradients for every batch!
-        optimizer.zero_grad()
-
-        # Make predictions for this batch
-        outputs = model(inputs)
-
-        # Compute the loss and its gradients
-        loss = loss_fn(outputs, labels)
+        optimizer.zero_grad()            # zero gradients for every batch
+        outputs = model(inputs)          # forward pass
+        loss = loss_fn(outputs, labels)  # loss and gradients
         loss.backward()
+        optimizer.step()                 # update weights
 
-        # Adjust learning weights
-        optimizer.step()
-
-        # Gather data and report
         running_loss += loss.item()
-        if i % 1000 == 999:
-            last_loss = running_loss / 1000 # loss per batch
-            print('  batch {} loss: {}'.format(i + 1, last_loss))
+        total_loss += loss.item()
+        n_batches += 1
+        if i % report_every == report_every - 1:
+            last_loss = running_loss / report_every
+            print(f"  batch {i + 1}/{len(training_loader)} loss: {last_loss:.4f}", flush=True)
             tb_x = epoch_index * len(training_loader) + i + 1
-            tb_writer.add_scalar('Loss/train', last_loss, tb_x)
+            tb_writer.add_scalar("Loss/train", last_loss, tb_x)
             running_loss = 0.
 
-    return last_loss
+    return total_loss / max(n_batches, 1)
+
+
+def evaluate(model, loss_fn, validation_loader):
+    """Average validation loss. eval() + no_grad() disable dropout/BN updates
+    and gradient tracking."""
+    model.eval()
+    running_vloss = 0.
+    with torch.no_grad():
+        for i, (vinputs, vlabels) in enumerate(validation_loader):
+            running_vloss += loss_fn(model(vinputs), vlabels).item()
+    return running_vloss / (i + 1)

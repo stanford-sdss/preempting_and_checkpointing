@@ -1,16 +1,23 @@
 Bootstrap: docker
-From: continuumio/miniconda3
+# Pin the base image so rebuilds are reproducible
+From: continuumio/miniconda3:24.9.2-0
 
 %post
-    conda init
-    # Create envs and install packages
-    conda create --name mytorch python=3.11 matplotlib numpy 
-    
     . /opt/conda/etc/profile.d/conda.sh
-    conda activate mytorch 
-    conda install pip
-    pip install torch torchvision tensorboard 
-    
-    # some special environment things for singularity
+
+    # -y: builds are non-interactive; without it conda can abort at the prompt
+    conda create -y --name mytorch python=3.11 pip
+    conda activate mytorch
+
+    # Pinned versions. CPU-only wheels keep the image small (fast pulls for a
+    # room full of people); the tutorial model trains on CPU.
+    pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.5.1 torchvision==0.20.1
+    pip install --no-cache-dir tensorboard==2.18.0 numpy==1.26.4
+
+    conda clean -afy
+
+    # Activate the env whenever the container runs
     echo ". /opt/conda/etc/profile.d/conda.sh" >> $SINGULARITY_ENVIRONMENT
     echo "conda activate mytorch" >> $SINGULARITY_ENVIRONMENT

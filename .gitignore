@@ -1,5 +1,8 @@
 data/
 models/
 runs/
-env/pytorch.sif
-.ipynb_checkpoints
+*.sif
+.ipynb_checkpoints/
+__pycache__/
+job/out/*
+!job/out/.gitkeep
