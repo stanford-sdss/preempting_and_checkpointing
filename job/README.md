@@ -14,13 +14,7 @@ cd preempting-and-checkpointing
 
 ## Step 3: Get the container
 
-From the top of the repo:
-
-```bash
-apptainer pull env/pytorch_latest.sif oras://ghcr.io/matrics-bootcamp/pytorch:latest
-```
-
-If that takes too long, copy the pre-pulled copy from Oak instead:
+Cpy the pre-pulled container from Oak:
 ```bash
 cp /oak/stanford/datasets/sdss/containers/preempting-and-checkpointing/pytorch_latest.sif  ./env/
 ```
