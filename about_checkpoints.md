@@ -21,7 +21,7 @@ If your code can handle being preempted, you get access to far more resources, a
 2. After a short grace period (check your partition's `GraceTime`; it may be very short), Slurm sends **SIGKILL**, which can't be caught.
 3. With `#SBATCH --requeue`, the job goes back in the queue **with the same job ID**, and `SLURM_RESTART_COUNT` goes up by one.
 
-`scontrol requeue <job_id>` triggers the same sequence on your own job, which is how we test it.
+`scontrol requeue $JOBID` triggers the same sequence on your own job, which is how we test it.
 
 ## Robust and Restartable Code
 

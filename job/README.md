@@ -8,8 +8,8 @@ Or via ssh: `ssh <sunet>@login.sherlock.stanford.edu`
 ## Step 2: Clone this repository
 
 ```bash
-git clone https://github.com/MATRICS-Bootcamp/preempting-and-checkpointing.git
-cd preempting-and-checkpointing
+git clone https://github.com/stanford-sdss/preempting_and_checkpointing.git
+cd preempting_and_checkpointing
 ```
 
 ## Step 3: Get the container
@@ -40,25 +40,45 @@ Still in the `job/` directory:
 
 ```bash
 mkdir -p out          # Slurm will NOT create the log directory for you
-sbatch preemptible_job.submit
+JOBID=$(sbatch --parsable preemptible_job.submit)
+echo $JOBID
 ```
 
-Write down the job ID that `sbatch` prints. Below it's `<job_id>`.
+`--parsable` makes `sbatch` print just the job ID, so we can save it in `$JOBID` and use it in every command below.
+
+> **Lost `$JOBID`?** (New terminal, dropped connection.) Get it back with:
+> ```bash
+> JOBID=$(squeue --me -h -n preempt_example -o %i | head -1)
+> ```
 
 ## Step 6: Watch the job
 
-Use three terminals (or tmux panes):
+One command opens a tmux session with everything on one screen:
 
 ```bash
-# 1. Job state
-watch -n 10 squeue --me
-
-# 2. Training log: look for "STARTING FRESH" and "Checkpoint saved"
-tail -f out/preempt_example_<job_id>.out
-
-# 3. Checkpoints appearing (one per epoch)
-watch -n 10 ls -lt ../models/<job_id>/
+tmux new-session -s lab "tail -F out/preempt_example_$JOBID.out" \; \
+  split-window -h "watch -n 10 squeue --me" \; \
+  split-window -v "watch -n 10 ls -lt ../models/$JOBID" \; \
+  split-window -v "JOBID=$JOBID bash" \; \
+  select-layout main-vertical \; \
+  set-option mouse on
 ```
+
+```
++----------------------------+----------------------+
+|                            | squeue: job state    |
+|  Training log              +----------------------+
+|  (look for STARTING FRESH  | checkpoints in       |
+|   and Checkpoint saved)    | ../models/$JOBID     |
+|                            +----------------------+
+|                            | your shell: run the  |
+|                            | next steps here      |
++----------------------------+----------------------+
+```
+
+* **Switch panes:** click one (mouse mode is on), or press `Ctrl-b` and then an arrow key.
+* **Scroll the log:** scroll with the mouse wheel over it; press `q` to go back to following it.
+* **Leave and come back later:** `Ctrl-b` then `d` detaches; `tmux attach -t lab` reattaches. Sherlock has several login nodes, so if you reconnect and the session is missing, ssh to the node you were on (e.g. `ssh sh03-ln01`).
 
 Each checkpoint is named for the **next** epoch to run: `model_5.pt` means "5 epochs done, resume at epoch 6."
 
@@ -66,43 +86,44 @@ While it runs, look at `train_model.py`. What goes into a checkpoint? Why is it 
 
 ## Step 7: Preempt the job
 
-Once a few checkpoints exist:
+Once a few checkpoints exist, run this in the shell pane (bottom right):
 
 ```bash
-scontrol requeue <job_id>
+scontrol requeue $JOBID
 ```
 
 This does the same thing to your job as a real preemption on `owners`: Slurm sends **SIGTERM**, waits a short grace period, then sends SIGKILL and puts the job back in the queue.
 
 ## Step 8: Observe again!
 
-* **Log:** you should see
+* **Log:** you should see something like this (your job ID instead of `12345678`):
   ```
   Caught signal SIGTERM: will save a checkpoint after the current batch and exit.
-  Checkpoint saved: ../models/<job_id>/model_N.pt
+  Checkpoint saved: ../models/12345678/model_4.pt
   Exiting after SIGTERM. Slurm will requeue the job.
   ```
   When the job starts again, a new header appears in the **same** log file:
   ```
-  RESUMED from checkpoint at epoch N  (job <job_id>, restart #1)
+  RESUMED from checkpoint at epoch 4  (job 12345678, restart #1)
   ```
 * **squeue:** the job goes `R` → `PD` → `R`. A requeued job waits in `PD` for a bit (often a minute or two) before it can start again. That's normal.
 * **sacct:** every run of the job shows up as its own row:
   ```bash
-  sacct -j <job_id> --duplicates --format=JobID,State,Start,End,Elapsed,NodeList
+  sacct -j $JOBID --duplicates --format=JobID,State,Start,End,Elapsed,NodeList
   ```
 
 Try requeueing it a second time. Does the restart count go up?
 
 ## Step 9 (optional): TensorBoard
 
-The loss curve continues across restarts because every run writes to `../runs/<job_id>`.
+The loss curve continues across restarts because every run writes to `../runs/$JOBID`.
 
 ## Step 10: Clean up
 
 ```bash
-scancel <job_id>
-rm -rf ../models/<job_id> ../runs/<job_id> out/preempt_example_<job_id>.*
+scancel $JOBID
+rm -rf ../models/$JOBID ../runs/$JOBID out/preempt_example_$JOBID.*
+tmux kill-session -t lab
 ```
 
 ## Things to try
