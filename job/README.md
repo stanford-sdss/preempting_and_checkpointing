@@ -51,7 +51,7 @@ echo $JOBID
 One command opens a tmux session with everything on one screen:
 
 ```bash
-tmux new-session -s lab "tail -F out/preempt_example_$JOBID.out" \; \
+tmux new-session -s lab "echo 'Waiting for job $JOBID to start...'; until [ -f out/preempt_example_$JOBID.out ]; do sleep 2; done; tail -F out/preempt_example_$JOBID.out" \; \
   split-window -h "watch -n 10 squeue --me" \; \
   split-window -v "watch -n 10 ls -lt ../models/$JOBID" \; \
   split-window -v "JOBID=$JOBID bash" \; \
