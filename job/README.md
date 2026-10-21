@@ -22,7 +22,7 @@ apptainer pull env/pytorch_latest.sif oras://ghcr.io/matrics-bootcamp/pytorch:la
 
 If that takes too long, copy the pre-pulled copy from Oak instead:
 ```bash
-cp /oak/stanford/schools/ees/containers/pytorch_latest.sif ./env/
+cp /oak/stanford/datasets/sdss/containers/preempting-and-checkpointing/pytorch_latest.sif  ./env/
 ```
 
 ## Step 4: Download the dataset (on the login node)
