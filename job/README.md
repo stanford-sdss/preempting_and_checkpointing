@@ -9,6 +9,7 @@ Or via ssh: `ssh <sunet>@login.sherlock.stanford.edu`
 
 ```bash
 cd $SCRATCH
+rm -rf preempting_and_checkpointing
 git clone https://github.com/stanford-sdss/preempting_and_checkpointing.git
 cd preempting_and_checkpointing
 ```
